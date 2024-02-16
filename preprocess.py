@@ -7,7 +7,7 @@ import json
 from src.folderconstants import *
 from shutil import copyfile
 
-datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB']
+datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'Floodwatch']
 
 wadi_drop = ['2_LS_001_AL', '2_LS_002_AL','2_P_001_STATUS','2_P_002_STATUS']
 
@@ -155,47 +155,67 @@ def load_data(dataset):
 			for i in range(0, len(indices), 2):
 				labels[indices[i]:indices[i+1], :] = 1
 			np.save(f'{folder}/{fn}_labels.npy', labels)
-	elif dataset == 'WADI':
-		dataset_folder = 'data/WADI'
-		ls = pd.read_csv(os.path.join(dataset_folder, 'WADI_attacklabels.csv'))
-		train = pd.read_csv(os.path.join(dataset_folder, 'WADI_14days.csv'), skiprows=1000, nrows=2e5)
-		test = pd.read_csv(os.path.join(dataset_folder, 'WADI_attackdata.csv'))
-		train.dropna(how='all', inplace=True); test.dropna(how='all', inplace=True)
-		train.fillna(0, inplace=True); test.fillna(0, inplace=True)
-		test['Time'] = test['Time'].astype(str)
-		test['Time'] = pd.to_datetime(test['Date'] + ' ' + test['Time'])
-		labels = test.copy(deep = True)
-		for i in test.columns.tolist()[3:]: labels[i] = 0
-		for i in ['Start Time', 'End Time']: 
-			ls[i] = ls[i].astype(str)
-			ls[i] = pd.to_datetime(ls['Date'] + ' ' + ls[i])
-		for index, row in ls.iterrows():
-			to_match = row['Affected'].split(', ')
-			matched = []
-			for i in test.columns.tolist()[3:]:
-				for tm in to_match:
-					if tm in i: 
-						matched.append(i); break			
-			st, et = str(row['Start Time']), str(row['End Time'])
-			labels.loc[(labels['Time'] >= st) & (labels['Time'] <= et), matched] = 1
-		train, test, labels = convertNumpy(train), convertNumpy(test), convertNumpy(labels)
-		print(train.shape, test.shape, labels.shape)
-		for file in ['train', 'test', 'labels']:
-			np.save(os.path.join(folder, f'{file}.npy'), eval(file))
-	elif dataset == 'MBA':
-		dataset_folder = 'data/MBA'
-		ls = pd.read_excel(os.path.join(dataset_folder, 'labels.xlsx'))
-		train = pd.read_excel(os.path.join(dataset_folder, 'train.xlsx'))
-		test = pd.read_excel(os.path.join(dataset_folder, 'test.xlsx'))
-		train, test = train.values[1:,1:].astype(float), test.values[1:,1:].astype(float)
-		train, min_a, max_a = normalize3(train)
-		test, _, _ = normalize3(test, min_a, max_a)
-		ls = ls.values[:,1].astype(int)
-		labels = np.zeros_like(test)
-		for i in range(-20, 20):
-			labels[ls + i, :] = 1
-		for file in ['train', 'test', 'labels']:
-			np.save(os.path.join(folder, f'{file}.npy'), eval(file))
+	elif dataset == 'Floodwatch':
+		dataset_folder = 'data/Floodwatch'
+		sensor_files = ['norain1+offset3.csv', 'normal1+offset2.csv', 'normal3+normal2.csv',
+					'normal4+osc1.csv', 'normal5+offset1.csv', 'normal5+offset1.csv',
+					'normal7+normal6.csv']  # Your paired CSV files
+		labels_file = 'anomalies.csv'
+		to_concat = []
+
+		for name in sensor_files:
+			file_path = os.path.join(dataset_folder, name)
+			data = pd.read_csv(file_path)
+			sensor_name = name.split('.')[0]
+			data['sensor_name'] = sensor_name
+			to_concat.append(data)
+
+		# Concatenate all sensor data into a single DataFrame
+		floodwatch_data = pd.concat(to_concat, ignore_index=True)
+
+		print(floodwatch_data.head())
+		# Load and process labels DataFrame
+		labels = pd.read_csv(os.path.join(dataset_folder, labels_file))
+		print(labels.head())
+
+		# Assuming 'sensor_name' column in 'labels' matches sensor filenames
+		for sensor_file in sensor_files:
+			sensor_name = sensor_file.split('+')[0]  # Extract sensor name from filename
+			sensor_data = floodwatch_data[floodwatch_data['sensor_name'] == sensor_name]
+			sensor_labels = labels[labels['sensor_name'] == sensor_name]
+
+			# Assuming 'anomalies' and 'length' columns in 'labels' define anomalies
+			anomaly_indices = []
+			for i in range(sensor_labels.shape[0]):
+				anomaly_start = sensor_labels.iloc[i]['anomalies'] - 1  # Adjust for zero-based indexing
+				anomaly_end = anomaly_start + sensor_labels.iloc[i]['length']
+				anomaly_indices.append([anomaly_start, anomaly_end])
+
+			# Create labels array for the sensor's data
+			sensor_labels_array = np.zeros(sensor_data.shape[0])
+			for start, end in anomaly_indices:
+				sensor_labels_array[start:end] = 1
+
+			# Extract, normalize, and save sensor data and labels
+			train_data = sensor_data[:-len(sensor_labels_array)//2]
+			test_data = sensor_data[len(sensor_labels_array)//2:]
+			train, min_a, max_a = normalize3(train_data)
+			test, _, _ = normalize3(test_data, min_a, max_a)
+
+			# Create folder if it doesn't exist
+			os.makedirs(folder, exist_ok=True)
+			print(f'Creating folder {folder}')
+
+			np.save(f'{folder}/{sensor_name}_train.npy', train)
+			np.save(f'{folder}/{sensor_name}_test.npy', test)
+			np.save(f'{folder}/{sensor_name}_labels.npy', sensor_labels_array)
+
+
+			
+
+
+
+
 	else:
 		raise Exception(f'Not Implemented. Check one of {datasets}')
 

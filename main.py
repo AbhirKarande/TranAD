@@ -4,7 +4,7 @@ import pandas as pd
 from tqdm import tqdm
 from src.models import *
 from src.constants import *
-from src.plotting import *
+#from src.plotting import *
 from src.pot import *
 from src.utils import *
 from src.diagnosis import *
@@ -313,7 +313,7 @@ if __name__ == '__main__':
 			accuracy_list.append((lossT, lr))
 		print(color.BOLD+'Training time: '+"{:10.4f}".format(time()-start)+' s'+color.ENDC)
 		save_model(model, optimizer, scheduler, e, accuracy_list)
-		plot_accuracies(accuracy_list, f'{args.model}_{args.dataset}')
+	#	plot_accuracies(accuracy_list, f'{args.model}_{args.dataset}')
 
 	### Testing phase
 	torch.zero_grad = True
@@ -321,10 +321,10 @@ if __name__ == '__main__':
 	print(f'{color.HEADER}Testing {args.model} on {args.dataset}{color.ENDC}')
 	loss, y_pred = backprop(0, model, testD, testO, optimizer, scheduler, training=False)
 
-	### Plot curves
-	if not args.test:
-		if 'TranAD' in model.name: testO = torch.roll(testO, 1, 0) 
-		plotter(f'{args.model}_{args.dataset}', testO, y_pred, loss, labels)
+	# ### Plot curves
+	# if not args.test:
+	# 	if 'TranAD' in model.name: testO = torch.roll(testO, 1, 0) 
+	# 	plotter(f'{args.model}_{args.dataset}', testO, y_pred, loss, labels)
 
 	### Scores
 	df = pd.DataFrame()
