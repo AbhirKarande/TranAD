@@ -204,7 +204,6 @@ def load_data(dataset):
 
 			# Create folder if it doesn't exist
 			os.makedirs(folder, exist_ok=True)
-			print(f'Creating folder {folder}')
 
 			np.save(f'{folder}/{sensor_name}_train.npy', train)
 			np.save(f'{folder}/{sensor_name}_test.npy', test)
