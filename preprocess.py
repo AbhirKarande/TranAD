@@ -189,7 +189,7 @@ def load_data(dataset):
 		for i, row in anomalies.iterrows():
 			anoms = ast.literal_eval(row["anomalies"])
 			length = int(row["length"])
-			label = np.zeros([length, 1], dtype=bool)
+			label = np.zeros([length, 3], dtype=bool)
 			for anomaly in anoms:
 				label[anomaly[0]:anomaly[1] + 1] = True
 			
@@ -205,11 +205,6 @@ def load_data(dataset):
 			current_index += length
 
 		labels = np.array(labels)
-		with open(os.path.join(output_folder, dataset + "_test_class.json"), 'w') as file:
-			json.dump(class_divisions, file)
-		with open(os.path.join(output_folder, dataset + "_test_channel.json"), 'w') as file:
-			json.dump(channel_divisions, file)
-
 
 
 		np.save(f'{folder}/train.npy', all_data_final[0])
