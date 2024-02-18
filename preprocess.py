@@ -6,6 +6,7 @@ import pickle
 import json
 from src.folderconstants import *
 from shutil import copyfile
+import ast
 
 datasets = ['synthetic', 'SMD', 'SWaT', 'SMAP', 'MSL', 'WADI', 'MSDS', 'UCR', 'MBA', 'NAB', 'Floodwatch']
 
@@ -139,6 +140,7 @@ def load_data(dataset):
 		dataset_folder = 'data/SMAP_MSL'
 		file = os.path.join(dataset_folder, 'labeled_anomalies.csv')
 		values = pd.read_csv(file)
+		print(values.head())
 		values = values[values['spacecraft'] == dataset]
 		filenames = values['chan_id'].values.tolist()
 		for fn in filenames:
@@ -157,57 +159,63 @@ def load_data(dataset):
 			np.save(f'{folder}/{fn}_labels.npy', labels)
 	elif dataset == 'Floodwatch':
 		dataset_folder = 'data/Floodwatch'
-		sensor_files = ['norain1+offset3.csv', 'normal1+offset2.csv', 'normal3+normal2.csv',
-					'normal4+osc1.csv', 'normal5+offset1.csv', 'normal5+offset1.csv',
-					'normal7+normal6.csv']  # Your paired CSV files
+		sensor_files = ['norain1+offset3.csv', 'normal1+offset2.csv', 'normal3+normal2.csv', 'normal4+osc1.csv', 'normal5+offset1.csv', 'normal7+normal6.csv']
 		labels_file = 'anomalies.csv'
-		to_concat = []
+		anomalies = pd.read_csv(os.path.join(dataset_folder, labels_file))
 
-		for name in sensor_files:
-			file_path = os.path.join(dataset_folder, name)
-			data = pd.read_csv(file_path)
-			sensor_name = name.split('.')[0]
-			data['sensor_name'] = sensor_name
-			to_concat.append(data)
+		#sensor_files = list(anomalies["sensor_name"])
+		to_concat=[]
 
-		# Concatenate all sensor data into a single DataFrame
-		floodwatch_data = pd.concat(to_concat, ignore_index=True)
+		# Load sensor data from CSVs
+		for f in sensor_files:
+			sensor_data = pd.read_csv(os.path.join(dataset_folder, f))
+			print(sensor_data.head())
+			sensor_name = f.split('.')[0] # Extract sensor name
+		#	sensor_data['sensor_name'] = sensor_name
+			to_concat.append(sensor_data.drop(["createdAtUnix"], axis=1))		
+		print(len(to_concat[1].head()))
+		all_data = np.concatenate(to_concat)
+		all_data=normalize3(all_data)
+		print(len(all_data[0]))
 
-		print(floodwatch_data.head())
-		# Load and process labels DataFrame
-		labels = pd.read_csv(os.path.join(dataset_folder, labels_file))
-		print(labels.head())
+		all_data_final = normalize3(all_data[0])
+		print(len(all_data_final[0]))
 
-		# Assuming 'sensor_name' column in 'labels' matches sensor filenames
-		for sensor_file in sensor_files:
-			sensor_name = sensor_file.split('+')[0]  # Extract sensor name from filename
-			sensor_data = floodwatch_data[floodwatch_data['sensor_name'] == sensor_name]
-			sensor_labels = labels[labels['sensor_name'] == sensor_name]
+		labels = []
+		class_divisions = {}
+		channel_divisions = []
+		current_index = 0
 
-			# Assuming 'anomalies' and 'length' columns in 'labels' define anomalies
-			anomaly_indices = []
-			for i in range(sensor_labels.shape[0]):
-				anomaly_start = sensor_labels.iloc[i]['anomalies'] - 1  # Adjust for zero-based indexing
-				anomaly_end = anomaly_start + sensor_labels.iloc[i]['length']
-				anomaly_indices.append([anomaly_start, anomaly_end])
+		for i, row in anomalies.iterrows():
+			anoms = ast.literal_eval(row["anomalies"])
+			length = int(row["length"])
+			label = np.zeros([length, 1], dtype=bool)
+			for anomaly in anoms:
+				label[anomaly[0]:anomaly[1] + 1] = True
+			
+			labels.extend(label)
 
-			# Create labels array for the sensor's data
-			sensor_labels_array = np.zeros(sensor_data.shape[0])
-			for start, end in anomaly_indices:
-				sensor_labels_array[start:end] = 1
 
-			# Extract, normalize, and save sensor data and labels
-			train_data = sensor_data[:-len(sensor_labels_array)//2]
-			test_data = sensor_data[len(sensor_labels_array)//2:]
-			train, min_a, max_a = normalize3(train_data)
-			test, _, _ = normalize3(test_data, min_a, max_a)
+			_class = row["sensor_name"]
+			if _class in class_divisions.keys():
+				class_divisions[_class][1] += length
+			else:
+				class_divisions[_class] = [current_index, current_index + length]
+			channel_divisions.append([current_index, current_index + length])
+			current_index += length
 
-			# Create folder if it doesn't exist
-			os.makedirs(folder, exist_ok=True)
+		labels = np.array(labels)
+		with open(os.path.join(output_folder, dataset + "_test_class.json"), 'w') as file:
+			json.dump(class_divisions, file)
+		with open(os.path.join(output_folder, dataset + "_test_channel.json"), 'w') as file:
+			json.dump(channel_divisions, file)
 
-			np.save(f'{folder}/{sensor_name}_train.npy', train)
-			np.save(f'{folder}/{sensor_name}_test.npy', test)
-			np.save(f'{folder}/{sensor_name}_labels.npy', sensor_labels_array)
+
+
+		np.save(f'{folder}/train.npy', all_data_final[0])
+		np.save(f'{folder}/test.npy', all_data_final[0])
+		np.save(f'{folder}/labels.npy', labels)
+
 
 
 			
