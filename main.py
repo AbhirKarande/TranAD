@@ -56,6 +56,7 @@ def save_model(model, optimizer, scheduler, epoch, accuracy_list):
         'accuracy_list': accuracy_list}, file_path)
 
 def load_model(modelname, dims):
+	print('dims', dims)
 	import src.models
 	model_class = getattr(src.models, modelname)
 	model = model_class(dims).double()
@@ -323,6 +324,9 @@ if __name__ == '__main__':
 	print(f'{color.HEADER}Testing {args.model} on {args.dataset}{color.ENDC}')
 	loss, y_pred = backprop(0, model, testD, testO, optimizer, scheduler, training=False)
 
+
+
+
 	# ### Plot curves
 	# if not args.test:
 	# 	if 'TranAD' in model.name: testO = torch.roll(testO, 1, 0) 
@@ -331,18 +335,24 @@ if __name__ == '__main__':
 	### Scores
 	df = pd.DataFrame()
 	lossT, _ = backprop(0, model, trainD, trainO, optimizer, scheduler, training=False)
-	for i in range(loss.shape[1]):
-		lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
-		result, pred = pot_eval(lt, l, ls); preds.append(pred)
-		df = df.append(result, ignore_index=True)
+
+	#allign labels with the batch size of 32
+
+	# for i in range(loss.shape[1]):
+	# 	lt, l, ls = lossT[:, i], loss[:, i], labels[:, i]
+	# 	result, pred = pot_eval(lt, l, ls); preds.append(pred)
+	# 	df = df.append(result, ignore_index=True)
 	# preds = np.concatenate([i.reshape(-1, 1) + 0 for i in preds], axis=1)
 	# pd.DataFrame(preds, columns=[str(i) for i in range(10)]).to_csv('labels.csv')
 	lossTfinal, lossFinal = np.mean(lossT, axis=1), np.mean(loss, axis=1)
 	labelsFinal = (np.sum(labels, axis=1) >= 1) + 0
+
+
+	
 	result, _ = pot_eval(lossTfinal, lossFinal, labelsFinal)
 	result.update(hit_att(loss, labels))
 	result.update(ndcg(loss, labels))
-	print(df)
+	#print(df)
 	pprint(result)
 	# pprint(getresults2(df, result))
 	# beep(4)
