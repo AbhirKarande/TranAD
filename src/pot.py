@@ -136,20 +136,28 @@ def pot_eval(init_score, score, label, q=1e-5, level=0.02):
     while True:
         try:
             s = SPOT(q)  # SPOT object
+            print('finished spot')
             s.fit(init_score, score)  # data import
+            print('finished fit')
             s.initialize(level=lms, min_extrema=False, verbose=False)  # initialization step
+            print('finished initialize')
         except: lms = lms * 0.999
         else: break
+    print('finished loop')
     ret = s.run(dynamic=False)  # run
+    print('finished run')
     # print(len(ret['alarms']))
     # print(len(ret['thresholds']))
     pot_th = np.mean(ret['thresholds']) * lm[1]
+    print('finished mean')
     # pot_th = np.percentile(score, 100 * lm[0])
     # np.percentile(score, 100 * lm[0])
     pred, p_latency = adjust_predicts(score, label, pot_th, calc_latency=True)
+    print('finished adjust')
     # DEBUG - np.save(f'{debug}.npy', np.array(pred))
     # DEBUG - print(np.argwhere(np.array(pred)))
     p_t = calc_point2point(pred, label)
+    print('finished calc_point2point')
     # print('POT result: ', p_t, pot_th, p_latency)
     return {
         'f1': p_t[0],
