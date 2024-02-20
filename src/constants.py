@@ -13,7 +13,7 @@ lm_d = {
 		'WADI': [(0.99, 1), (0.999, 1)],
 		'MSDS': [(0.91, 1), (0.9, 1.04)],
 		'MBA': [(0.87, 1), (0.93, 1.04)],
-        'Floodwatch': [(0.995, 1.02), (0.999, 1.03)]
+        'Floodwatch': [(0.98, 1), (0.98, 1)]
 	}
 lm = lm_d[args.dataset][1 if 'TranAD' in args.model else 0]
 
